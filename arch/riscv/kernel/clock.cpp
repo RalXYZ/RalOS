@@ -3,13 +3,15 @@ extern "C" {
     void clock_set_next_event();
 }
 
+using time_t = unsigned long;
+
 // the frequency of QEMU has been set to be 10MHz
-// which means one second contains 10000000 clock cycles。
-const unsigned long TIMECLOCK = 10000000;
+// which means one second contains 10000000 clock cycles
+const time_t TIMECLOCK = 10000000;
 
 auto get_cycles() {
     // get the value stored in `time` register
-    unsigned long mtime;
+    time_t mtime;
     __asm__ volatile (
         "rdtime %[mtime]"
         : [mtime] "=r" (mtime)
