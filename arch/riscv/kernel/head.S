@@ -1,8 +1,9 @@
 .extern start_kernel
 .extern clock_set_next_event
+.extern unsigned long TIME_CLOCK  # defined in clock.cpp
 
-    .section .text.init
-    .globl _start
+.section .text.init
+.globl _start
 _start:
 # YOUR CODE HERE
 
@@ -18,14 +19,15 @@ _start:
 
     # sie: SEIE UEIE 0 0 STIE UTIE 0 0 SSIE USIE
     # set sie[STIE] = 1
-    li a0, 0x20
+    csrr a0, sie
+    ori a0, a0, 0x20   # mask the sixth bit
     csrw sie, a0
 
 # ------------------
 
     # set first time interrupt
     rdtime a0
-    ld a1, time_clock
+    ld a1, TIME_CLOCK
     add a0, a0, a1
     li a1, 0
     li a2, 0
@@ -40,8 +42,7 @@ _start:
 
     # sstatus: ... UPIE 0 0 SIE UIE
     # set sstatus[SIE] = 1
-    li a0, 0x2
-    csrw sstatus, a0
+    csrsi sstatus, 0b10
 
 # ------------------
 
@@ -49,10 +50,6 @@ _start:
 # - your lab1 code -
 # ------------------
     j start_kernel
-
-    .section .data
-time_clock:
-    .dword 10000000
 
     .section .bss.stack
     .globl boot_stack
