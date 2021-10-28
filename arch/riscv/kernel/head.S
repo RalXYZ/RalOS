@@ -1,11 +1,12 @@
 .extern start_kernel
 .extern clock_set_next_event
+.extern mm_init
 .extern unsigned long TIME_CLOCK  # defined in clock.cpp
 
 .section .text.init
 .globl _start
 _start:
-# YOUR CODE HERE
+# -----------
 
     la sp, boot_stack_top
 
@@ -45,6 +46,9 @@ _start:
     csrsi sstatus, 0b10
 
 # ------------------
+
+    # initialize memory management system
+    jal ra, mm_init
 
 # ------------------
 # - your lab1 code -
