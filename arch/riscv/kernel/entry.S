@@ -23,6 +23,7 @@
 .section .text.entry
 .align 2
 .globl _traps
+
 _traps:
 # -----------
 
@@ -53,7 +54,7 @@ _traps:
         LOAD_FROM_SP_OFFSET_N %n
         .set n, n + 1
     .endr
-
+    
     addi sp, sp, REG_SIZE * REG_NUM
 
 # -----------
