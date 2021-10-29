@@ -1,19 +1,22 @@
-#include "proc.h"
+extern "C" {
+#include "defs.h"
 #include "mm.h"
 #include "rand.h"
-#include "defs.h"
 #include "printk.h"
+#include "proc.h"
+}
 
-extern void __dummy();
-extern void __switch_to(struct task_struct* prev, struct task_struct* next);
+extern "C" {
+    extern void __dummy();
+    extern void __switch_to(struct task_struct* prev, struct task_struct* next);
+    struct task_struct* idle;           // idle process
+    struct task_struct* current;        // points to the current running thread
+    struct task_struct* task[NR_TASKS]; // thread array, all threads are stored here
+}
 
-struct task_struct* idle;           // idle process
-struct task_struct* current;        // points to the current running thread
-struct task_struct* task[NR_TASKS]; // thread array, all threads are stored here
-
-void task_init() {
+auto task_init() -> void {
     // call kalloc() to allocate a physical page for idle
-    idle = (struct task_struct *)kalloc();
+    idle = reinterpret_cast<task_struct *>(kalloc());
 
     // set state to TASK_RUNNING
     idle->state = TASK_RUNNING;
@@ -32,8 +35,8 @@ void task_init() {
     /* ----------------------------------------------- */
 
     // initialize task[1] ~ task[NR_TASKS - 1]
-    for (unsigned int i = 1; i < NR_TASKS; i++) {
-        task[i] = (struct task_struct *)kalloc();
+    for (size_t i = 1; i < NR_TASKS; i++) {
+        task[i] = reinterpret_cast<task_struct *>(kalloc());
         task[i]->state = TASK_RUNNING;
         task[i]->counter = 0;
         task[i]->priority = rand();
@@ -42,18 +45,18 @@ void task_init() {
         // set `ra` and `sp` in `thread_struct`
         // `ra` is set to be the address of __dummy
         // `sp` is set to the highest address of the applied physical page
-        task[i]->thread.ra = (uint64)__dummy;
-        task[i]->thread.sp = (((uint64)task) + PGSIZE);
+        task[i]->thread.ra = reinterpret_cast<uint64>(__dummy);
+        task[i]->thread.sp = reinterpret_cast<uint64>(task) + PGSIZE;
     }
 
     printk("...proc_init done!\n");
 }
 
-void dummy() {
-    uint64 MOD = 1000000007;
+auto dummy() -> void {
+    uint64 MOD = 1'000'000'007;
     uint64 auto_inc_local_var = 0;
     int last_counter = -1;
-    while(1) {
+    while (true) {
         if (last_counter == -1 || current->counter != last_counter) {
             last_counter = current->counter;
             auto_inc_local_var = (auto_inc_local_var + 1) % MOD;
@@ -62,9 +65,9 @@ void dummy() {
     }
 }
 
-void switch_to(struct task_struct* next) {
+auto switch_to(task_struct* next) -> void {
     if (next != current) {
-        struct task_struct* prev = current;
+        auto prev = current;
         current = next;
         __switch_to(prev, next);
     }
