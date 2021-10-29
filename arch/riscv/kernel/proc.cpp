@@ -46,21 +46,21 @@ auto task_init() -> void {
         // `ra` is set to be the address of __dummy
         // `sp` is set to the highest address of the applied physical page
         task[i]->thread.ra = reinterpret_cast<uint64>(__dummy);
-        task[i]->thread.sp = reinterpret_cast<uint64>(task) + PGSIZE;
+        task[i]->thread.sp = reinterpret_cast<uint64>(task[i]) + PGSIZE;
     }
 
     printk("...proc_init done!\n");
 }
 
 auto dummy() -> void {
-    uint64 MOD = 1'000'000'007;
+    const uint64 MOD = 1'000'000'007;
     uint64 auto_inc_local_var = 0;
     int last_counter = -1;
     while (true) {
-        if (last_counter == -1 || current->counter != last_counter) {
+        if (last_counter == -1 or current->counter != last_counter) {
             last_counter = current->counter;
             auto_inc_local_var = (auto_inc_local_var + 1) % MOD;
-            printk("[PID = %d] is running. auto_inc_local_var = %d\n", current->pid, auto_inc_local_var); 
+            printk("[PID = %d] is running. auto_inc_local_var = %d\n", current->pid, auto_inc_local_var);
         }
     }
 }
@@ -69,6 +69,40 @@ auto switch_to(task_struct* next) -> void {
     if (next != current) {
         auto prev = current;
         current = next;
+        printk("\nswitch to [PID = %d COUNTER = %d]\n", next->pid, next->counter);
         __switch_to(prev, next);
+    }
+}
+
+auto do_timer() -> void {
+    // if current thread is the idle thread or the remaining execution time is 0, execute a schedule
+    if (current->pid == 0 or current->counter == 0) {
+        schedule();
+    }
+}
+
+auto schedule() -> void {
+    bool has_min = false;
+    decltype(current->pid) min_remaining_time = -1;
+    size_t min_index = 0;
+    for (size_t i = 1; i < NR_TASKS; i++) {
+        if (task[i]->state != TASK_RUNNING) {
+            continue;
+        }
+        if (task[i]->counter != 0 and task[i]->counter < min_remaining_time) {
+            has_min = true;
+            min_remaining_time = task[i]->counter;
+            min_index = i;
+        }
+    }
+    if (has_min) {
+        switch_to(task[min_index]);
+    } else {
+        printk("\n");
+        for (size_t i = 1; i < NR_TASKS; i++) {
+            task[i]->counter = rand();
+            printk("set [PID = %d COUNTER = %d]\n", task[i]->pid, task[i]->counter);
+        }
+        schedule();
     }
 }

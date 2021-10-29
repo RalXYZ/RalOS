@@ -1,7 +1,10 @@
 #include "printk.h"
 #include "clock.h"
+#include "proc.h"
 
 #define INTERRUPT_MASK 0x8000000000000000
+
+extern struct task_struct* current;  // proc.cpp
 
 void trap_handler(unsigned long scause, unsigned long sepc) {
     // judge the type of trap by scause
@@ -15,8 +18,12 @@ void trap_handler(unsigned long scause, unsigned long sepc) {
     }
 
     // output message, set the next timer interrupt by calling clock_set_next_event
-    printk("kernel is running!\n[S] Supervisor Mode Timer Interrupt\n");
+    // printk("kernel is running!\n[S] Supervisor Mode Timer Interrupt\n");
+    
     clock_set_next_event();
+
+    current->counter--;
+    do_timer();
 
     // other interrupts or exceptions can be ignored
     return;
