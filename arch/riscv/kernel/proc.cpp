@@ -57,7 +57,7 @@ auto dummy() -> void {
     uint64 auto_inc_local_var = 0;
     int last_counter = -1;
     while (true) {
-        if (last_counter == -1 or current->counter != last_counter) {
+        if (last_counter == -1 or current->counter != static_cast<uint64>(last_counter)) {
             last_counter = current->counter;
             auto_inc_local_var = (auto_inc_local_var + 1) % MOD;
             printk("[PID = %d] is running. auto_inc_local_var = %d\n", current->pid, auto_inc_local_var);
@@ -120,7 +120,7 @@ auto schedule() -> void {
             continue;
         }
         if (task[i]->counter != 0 and task[i]->priority >= max_priority) {
-            if (task[i]->priority == max_priority and task[i]->counter < min_remaining_time or task[i]->priority > max_priority) {
+            if ((task[i]->priority == max_priority and task[i]->counter < min_remaining_time) or task[i]->priority > max_priority) {
                 max_priority = task[i]->priority;
                 has_prior = true;
                 min_remaining_time = task[i]->counter;

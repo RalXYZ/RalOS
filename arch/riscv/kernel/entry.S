@@ -45,7 +45,7 @@ _traps:
         SAVE_TO_SP_OFFSET_N %n
         .set n, n + 1
     .endr
-    csrr a1, sepc  # a1 is the parameter of 'trap_handler' below! do not change this register!
+    csrr a1, sepc  # a1 could be the parameter of 'trap_handler' below! do not change this register!
     SAVE_TO_SP_OFFSET a1, 31
 
     # call trap_handler

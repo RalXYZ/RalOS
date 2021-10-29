@@ -6,7 +6,7 @@
 
 extern struct task_struct* current;  // proc.cpp
 
-void trap_handler(unsigned long scause, unsigned long sepc) {
+void trap_handler(unsigned long scause) {  // there could exist a second parameter `sepc`
     // judge the type of trap by scause
     if (!(scause & INTERRUPT_MASK)) {
         return;
