@@ -69,7 +69,7 @@ auto switch_to(task_struct* next) -> void {
     if (next != current) {
         auto prev = current;
         current = next;
-        printk("\nswitch to [PID = %d COUNTER = %d]\n", next->pid, next->counter);
+        printk("\nswitch to [PID = %d COUNTER = %d PRIORITY = %d]\n", next->pid, next->counter, next->priority);
         __switch_to(prev, next);
     }
 }
@@ -81,9 +81,10 @@ auto do_timer() -> void {
     }
 }
 
+#ifdef SJF
 auto schedule() -> void {
-    bool has_min = false;
-    decltype(current->pid) min_remaining_time = -1;
+    auto has_min = false;
+    decltype(current->pid) min_remaining_time = -1;  // max of decltype(current->pid)
     size_t min_index = 0;
     for (size_t i = 1; i < NR_TASKS; i++) {
         if (task[i]->state != TASK_RUNNING) {
@@ -106,3 +107,37 @@ auto schedule() -> void {
         schedule();
     }
 }
+#endif
+
+#ifdef PRIORITY
+auto schedule() -> void {
+    auto has_prior = false;
+    decltype(current->priority) max_priority = 0;
+    decltype(current->pid) min_remaining_time = -1;  // max of decltype(current->pid)
+    size_t min_index = 0;
+    for (size_t i = 1; i < NR_TASKS; i++) {
+        if (task[i]->state != TASK_RUNNING) {
+            continue;
+        }
+        if (task[i]->counter != 0 and task[i]->priority >= max_priority) {
+            if (task[i]->priority == max_priority and task[i]->counter < min_remaining_time or task[i]->priority > max_priority) {
+                max_priority = task[i]->priority;
+                has_prior = true;
+                min_remaining_time = task[i]->counter;
+                min_index = i;
+            }
+            
+        }
+    }
+    if (has_prior) {
+        switch_to(task[min_index]);
+    } else {
+        printk("\n");
+        for (size_t i = 1; i < NR_TASKS; i++) {
+            task[i]->counter = rand();
+            printk("set [PID = %d COUNTER = %d PRIORITY = %d]\n", task[i]->pid, task[i]->counter, task[i]->priority);
+        }
+        schedule();
+    }
+}
+#endif
