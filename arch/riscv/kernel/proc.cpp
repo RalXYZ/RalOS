@@ -14,6 +14,13 @@ extern "C" {
     struct task_struct* task[NR_TASKS]; // thread array, all threads are stored here
 }
 
+#define GREEN "\033[0;32m"
+#define YELLOW "\033[0;33m"
+#define BLUE  "\033[0;34m"
+#define NC "\033[0m"
+
+auto switch_happened = false;
+
 auto task_init() -> void {
     // call kalloc() to allocate a physical page for idle
     idle = reinterpret_cast<task_struct *>(kalloc());
@@ -57,10 +64,11 @@ auto dummy() -> void {
     uint64 auto_inc_local_var = 0;
     int last_counter = -1;
     while (true) {
-        if (last_counter == -1 or current->counter != static_cast<uint64>(last_counter)) {
+        if (current->counter != static_cast<uint64>(last_counter) or switch_happened or last_counter == -1) {
+            switch_happened = false;
             last_counter = current->counter;
             auto_inc_local_var = (auto_inc_local_var + 1) % MOD;
-            printk("[PID = %d] is running. auto_inc_local_var = %d\n", current->pid, auto_inc_local_var);
+            printk(GREEN "[PID = %d]" NC "is running. auto_inc_local_var = %d\n", current->pid, auto_inc_local_var);
         }
     }
 }
@@ -69,7 +77,8 @@ auto switch_to(task_struct* next) -> void {
     if (next != current) {
         auto prev = current;
         current = next;
-        printk("\nswitch to [PID = %d COUNTER = %d PRIORITY = %d]\n", next->pid, next->counter, next->priority);
+        switch_happened = true;
+        printk(YELLOW "\nswitch to [PID = %d COUNTER = %d PRIORITY = %d]\n" NC, next->pid, next->counter, next->priority);
         __switch_to(prev, next);
     }
 }
@@ -102,7 +111,7 @@ auto schedule() -> void {
         printk("\n");
         for (size_t i = 1; i < NR_TASKS; i++) {
             task[i]->counter = rand();
-            printk("set [PID = %d COUNTER = %d]\n", task[i]->pid, task[i]->counter);
+            printk(BLUE "set [PID = %d COUNTER = %d]\n" NC, task[i]->pid, task[i]->counter);
         }
         schedule();
     }
@@ -135,7 +144,7 @@ auto schedule() -> void {
         printk("\n");
         for (size_t i = 1; i < NR_TASKS; i++) {
             task[i]->counter = rand();
-            printk("set [PID = %d COUNTER = %d PRIORITY = %d]\n", task[i]->pid, task[i]->counter, task[i]->priority);
+            printk(BLUE "set [PID = %d COUNTER = %d PRIORITY = %d]\n" NC, task[i]->pid, task[i]->counter, task[i]->priority);
         }
         schedule();
     }
