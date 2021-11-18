@@ -19,7 +19,7 @@ extern "C" {
 #define BLUE  "\033[0;34m"
 #define NC "\033[0m"
 
-auto switch_happened = false;
+int last_counter = -1;  // this variable is previously declared in dummy()
 
 auto task_init() -> void {
     // call kalloc() to allocate a physical page for idle
@@ -62,11 +62,9 @@ auto task_init() -> void {
 auto dummy() -> void {
     const uint64 MOD = 1'000'000'007;
     uint64 auto_inc_local_var = 0;
-    int last_counter = -1;
     while (true) {
-        if (current->counter != static_cast<uint64>(last_counter) or switch_happened or last_counter == -1) {
-            switch_happened = false;
-            last_counter = current->counter;
+        if (current->counter != static_cast<uint64>(::last_counter) or ::last_counter == -1) {
+            ::last_counter = current->counter;
             auto_inc_local_var = (auto_inc_local_var + 1) % MOD;
             printk(GREEN "[PID = %d]" NC "is running. auto_inc_local_var = %d\n", current->pid, auto_inc_local_var);
         }
@@ -77,7 +75,7 @@ auto switch_to(task_struct* next) -> void {
     if (next != current) {
         auto prev = current;
         current = next;
-        switch_happened = true;
+        ::last_counter = -1;
         printk(YELLOW "\nswitch to [PID = %d COUNTER = %d PRIORITY = %d]\n" NC, next->pid, next->counter, next->priority);
         __switch_to(prev, next);
     }
