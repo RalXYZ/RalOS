@@ -1,22 +1,29 @@
+#include "defs.h"
+
 /* target architecture */
 OUTPUT_ARCH( "riscv" )
 
-/* program entry */
+/* program entrance */
 ENTRY( _start )
 
-/* starting address of kernel assembly */
-BASE_ADDR = 0x80200000;
+MEMORY {
+    ram  (wxa!ri): ORIGIN = PHY_START + OPENSBI_SIZE, LENGTH = PHY_SIZE - OPENSBI_SIZE
+    ramv (wxa!ri): ORIGIN = VM_START + OPENSBI_SIZE, LENGTH = VM_SIZE - OPENSBI_SIZE
+}
+
+/* the starting address of kernel code */
+BASE_ADDR = VM_START + OPENSBI_SIZE;
 
 SECTIONS
 {
-    /* . means current address */
+    /* . represents the current address */
     . = BASE_ADDR;
 
-    /* store the starting address of kernel asm */
+    /* store the starting address of kernel code */
     _skernel = .;
 
     /* ALIGN(0x1000) means align to 4KB */
-    /* _stext, _etext stores the starting and ending address of .text segment respectively */
+    /* _stext, _etext stores the starting and ending address of text segment respectively */
     .text : ALIGN(0x1000){
         _stext = .;
 
@@ -25,23 +32,25 @@ SECTIONS
         *(.text .text.*)
         
         _etext = .;
-    }
+    } >ramv AT>ram
 
     .rodata : ALIGN(0x1000){
         _srodata = .;
 
+        *(.srodata .srodata.*)
         *(.rodata .rodata.*)
         
         _erodata = .;
-    }
+    } >ramv AT>ram
 
     .data : ALIGN(0x1000){
         _sdata = .;
 
+        *(.sdata .sdata*)
         *(.data .data.*)
         
         _edata = .;
-    }
+    } >ramv AT>ram
 
     .bss : ALIGN(0x1000){
         _sbss = .;
@@ -51,8 +60,8 @@ SECTIONS
         *(.bss .bss.*)
         
         _ebss = .;
-    }
+    } >ramv AT>ram
 
-    /* store the ending address of kernel asm */
+    /* stores the ending address of kernel code */
     _ekernel = .;
-}
+} 
