@@ -1,6 +1,9 @@
+#include "defs.h"
+
 .extern start_kernel
 .extern clock_set_next_event
 .extern mm_init
+
 .extern unsigned long TIME_CLOCK  # defined in clock.cpp
 
 .section .text.init
@@ -8,6 +11,9 @@
 _start:
 
     la sp, boot_stack_top
+
+    call setup_vm
+    call relocate
 
     # set stvec = _traps
     la a0, _traps
@@ -44,10 +50,36 @@ _start:
 
     j start_kernel
 
-    .section .bss.stack
-    .globl boot_stack
-boot_stack:
-    .space 0x1000
 
-    .globl boot_stack_top
+
+relocate:
+    ld t0, PA2VA_OFFSET
+
+    # set ra = ra + PA2VA_OFFSET
+    add ra, ra, t0
+
+    # set sp = sp + PA2VA_OFFSET
+    add sp, sp, t0
+
+    # set satp with early_pgtbl
+    la t1, early_pgtbl
+    srli t1, t1, 12
+    li t2, 0x8000000000000000  # set mode to 8, which means page-based 39 bit virtual addressing
+    or t1, t1, t2
+
+    csrw satp, t1
+
+    # flush tlb
+    sfence.vma zero, zero
+
+    ret
+
+
+
+.section .bss.stack
+.globl boot_stack
+boot_stack:
+.space 0x1000
+
+.globl boot_stack_top
 boot_stack_top:
