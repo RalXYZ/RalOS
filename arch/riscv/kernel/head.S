@@ -53,7 +53,7 @@ _start:
 
 
 relocate:
-    ld t0, PA2VA_OFFSET
+    li t0, PA2VA_OFFSET
 
     # set ra = ra + PA2VA_OFFSET
     add ra, ra, t0
@@ -63,8 +63,8 @@ relocate:
 
     # set satp with early_pgtbl
     la t1, early_pgtbl
-    srli t1, t1, 12
-    li t2, 0x8000000000000000  # set mode to 8, which means page-based 39 bit virtual addressing
+    srli t1, t1, 12            # put 44-bit PPN at the lowest 44 bits
+    li t2, 0x8000000000000000  # set mode to 8, which means page-based 39-bit virtual addressing
     or t1, t1, t2
 
     csrw satp, t1
