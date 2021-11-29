@@ -15,7 +15,7 @@ vmlinux.lds: vmlinux.lds.S
 	${GCC}  ${CFLAG} -c $<
 
 %.o:%.cpp
-	${GXX}  ${CFLAG} -c $<
+	${GXX}  ${CFLAG} -std=c++20 -c $<
 
 clean:
 	$(shell rm *.o vmlinux.lds 2>/dev/null)

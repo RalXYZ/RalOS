@@ -14,11 +14,6 @@ extern "C" {
     struct task_struct* task[NR_TASKS]; // thread array, all threads are stored here
 }
 
-#define GREEN "\033[0;32m"
-#define YELLOW "\033[0;33m"
-#define BLUE  "\033[0;34m"
-#define NC "\033[0m"
-
 int last_counter = -1;  // this variable is previously declared in dummy()
 
 auto task_init() -> void {

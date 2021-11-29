@@ -3,6 +3,7 @@
 .extern start_kernel
 .extern clock_set_next_event
 .extern mm_init
+.extern setup_vm_final
 
 .extern unsigned long TIME_CLOCK  # defined in clock.cpp
 
@@ -45,6 +46,9 @@ _start:
     # initialize memory management system
     jal ra, mm_init
 
+    # after initialized free list of memory, we can use kalloc() to allocate page table
+    call setup_vm_final  
+
     # initialize threads
     jal ra, task_init
 
@@ -63,8 +67,8 @@ relocate:
 
     # set satp with early_pgtbl
     la t1, early_pgtbl
-    srli t1, t1, 12            # put 44-bit PPN at the lowest 44 bits
-    li t2, 0x8000000000000000  # set mode to 8, which means page-based 39-bit virtual addressing
+    srli t1, t1, 12              # put 44-bit PPN at the lowest 44 bits
+    li t2, RISCV_SV39_MODE_MASK  # set mode to 8, which means page-based 39-bit virtual addressing
     or t1, t1, t2
 
     csrw satp, t1
