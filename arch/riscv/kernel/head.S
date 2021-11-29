@@ -39,15 +39,15 @@ _start:
     li a7, 0
     ecall
 
-    # sstatus: ... UPIE 0 0 SIE UIE
-    # set sstatus[SIE] = 1
-    csrsi sstatus, 0b10
-
     # initialize memory management system
     jal ra, mm_init
 
     # after initialized free list of memory, we can use kalloc() to allocate page table
     call setup_vm_final  
+
+    # sstatus: ... UPIE 0 0 SIE UIE
+    # set sstatus[SIE] = 1
+    csrsi sstatus, 0b10
 
     # initialize threads
     jal ra, task_init
