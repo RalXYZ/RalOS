@@ -1,8 +1,7 @@
 #include "defs.h"
 #include "string.h"
 #include "mm.h"
-
-#include "printk.h"
+#include "log.h"
 
 extern char _ekernel[];
 
@@ -44,5 +43,5 @@ void kfreerange(char *start, char *end) {
 
 void mm_init(void) {
     kfreerange(_ekernel, (char *)(VM_START + PHY_SIZE));
-    printk("...mm_init done!\n");
+    log_ok("Memory initialization succeeded, free list created");
 }

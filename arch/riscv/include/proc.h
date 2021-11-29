@@ -1,3 +1,6 @@
+#ifndef _PROC_H
+#define _PROC_H
+
 #include "types.h"
 
 #define NR_TASKS  (1 + 31) // control maximum thread amount （idle thread + 31 kernel threads）
@@ -45,3 +48,5 @@ void switch_to(struct task_struct* next);
 
 /* dummy function: a loop function, prints the thread's pid and a self-increasing local variable iteratively */
 void dummy(); 
+
+#endif

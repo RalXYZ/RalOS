@@ -1,9 +1,10 @@
 extern "C" {
-#include "defs.h"
-#include "mm.h"
-#include "rand.h"
-#include "printk.h"
-#include "proc.h"
+    #include "defs.h"
+    #include "mm.h"
+    #include "rand.h"
+    #include "printk.h"
+    #include "proc.h"
+    #include "log.h"
 }
 
 extern "C" {
@@ -51,7 +52,7 @@ auto task_init() -> void {
         task[i]->thread.sp = reinterpret_cast<uint64>(task[i]) + PGSIZE;
     }
 
-    printk("...proc_init done!\n");
+    log_ok(const_cast<char*>("Process initialization succeeded"));
 }
 
 auto dummy() -> void {
@@ -61,7 +62,7 @@ auto dummy() -> void {
         if (current->counter != static_cast<uint64>(::last_counter) or ::last_counter == -1) {
             ::last_counter = current->counter;
             auto_inc_local_var = (auto_inc_local_var + 1) % MOD;
-            printk(GREEN "[PID = %d]" NC "is running. auto_inc_local_var = %d\n", current->pid, auto_inc_local_var);
+            printk(GREEN "[PID = %d]" NC "is running, auto_inc_local_var = %d, thread space begin at 0xffffffe0%x\n", current->pid, auto_inc_local_var, current);
         }
     }
 }

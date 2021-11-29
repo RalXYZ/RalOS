@@ -1,8 +1,8 @@
 extern "C" {
     #include "mm.h"
+    #include "log.h"
     #include "defs.h"
     #include "string.h"
-    #include "printk.h"
 }
 
 extern "C" {
@@ -63,8 +63,8 @@ inline auto align_diff_to_pgsize(const uint64 start, const uint64 end) -> uint64
     return ((end - start) / PGSIZE + !!(end % PGSIZE)) * PGSIZE;
 }
 
-auto panic() -> void {
-    printk(RED "kernel panic!" NC);
+auto panic(char *content) -> void {
+    log_failed(content);
     __asm__ volatile("ebreak");
 };
 
@@ -86,7 +86,7 @@ constexpr auto get_pgtbl_index(const uint64 va, const uint64 level) -> uint64 {
                     >> PAGE_OFFSET_lEN
                     &  generate_mask(PAGE_INDEX_LEN);
         default:
-            panic();
+            panic(const_cast<char*>("Kernel panic: invalid page table level"));
             return 0;  // never reach here
     }
 }
@@ -112,6 +112,8 @@ auto setup_vm() -> void {
     // the middle 9 bits are used as index of early_pgtbl
     early_pgtbl[get_pgtbl_index(PHY_START_CPP, 1)] = one_level_pte_content;
     early_pgtbl[get_pgtbl_index(VM_START_CPP, 1)] = one_level_pte_content;
+
+    log_ok(const_cast<char*>("First-time virtual memory mapping finished"));
 }
 
 // create multi-level page table mapping
@@ -147,6 +149,8 @@ auto create_mapping(uint64* const pgtbl, const uint64 va, const uint64 pa, const
     }
 }
 
+// perform a 128MB mapping, using three level page table
+// and considering kernel segments 
 auto setup_vm_final() -> void {
     auto stext_addr = reinterpret_cast<uint64>(&_stext);
     auto etext_addr = reinterpret_cast<uint64>(&_etext);
@@ -163,8 +167,13 @@ auto setup_vm_final() -> void {
     // No OpenSBI mapping required
 
     // mapping kernel text X|-|R|V
-    create_mapping(swapper_pg_dir, stext_addr, va_to_pa(stext_addr), align_diff_to_pgsize(stext_addr, etext_addr), PTE_VRX);
-    printk(GREEN ".text virtual memory mapped\n" NC);
+    create_mapping(swapper_pg_dir,
+            stext_addr,
+            va_to_pa(stext_addr),
+            align_diff_to_pgsize(stext_addr, etext_addr),
+            PTE_VRX
+    );
+    log_ok(const_cast<char*>(".text   virtual memory mapped, permission set to R-X"));
 
     // mapping kernel rodata -|-|R|V
     create_mapping(swapper_pg_dir,
@@ -173,13 +182,23 @@ auto setup_vm_final() -> void {
             align_diff_to_pgsize(srodata_addr, erodata_addr),
             PTE_VR
     );
-    printk(GREEN ".rodata virtual memory mapped\n" NC);
+    log_ok(const_cast<char*>(".rodata virtual memory mapped, permission set to R--"));
 
     // mapping other memory -|W|R|V
-    create_mapping(swapper_pg_dir, sdata_addr, va_to_pa(sdata_addr), align_diff_to_pgsize(sdata_addr, edata_addr), PTE_VRW);
-    printk(GREEN ".data virtual memory mapped\n" NC);
-    create_mapping(swapper_pg_dir, sbss_addr, va_to_pa(sbss_addr), align_diff_to_pgsize(sbss_addr, ebss_addr), PTE_VRW);
-    printk(GREEN ".data virtual memory mapped\n" NC);
+    create_mapping(swapper_pg_dir,
+            sdata_addr,
+            va_to_pa(sdata_addr),
+            align_diff_to_pgsize(sdata_addr, edata_addr),
+            PTE_VRW
+    );
+    log_ok(const_cast<char*>(".data   virtual memory mapped, permission set to RW-"));
+    create_mapping(swapper_pg_dir,
+            sbss_addr,
+            va_to_pa(sbss_addr),
+            align_diff_to_pgsize(sbss_addr, ebss_addr),
+            PTE_VRW
+    );
+    log_ok(const_cast<char*>(".bss    virtual memory mapped, permission set to RW-"));
 
     const uint64 ekernel_rnd_up_addr = (ekernel_addr / PGSIZE + !!(ekernel_addr % PGSIZE)) * PGSIZE ;
     create_mapping(swapper_pg_dir,
@@ -188,7 +207,7 @@ auto setup_vm_final() -> void {
             align_diff_to_pgsize(ekernel_rnd_up_addr, VM_START + PHY_SIZE),
             PTE_VRW
     );
-    printk(GREEN "other virtual memory mapped\n" NC);
+    log_ok(const_cast<char*>("Other   virtual memory mapped, permission set to RW-"));
 
     // set satp with swapper_pg_dir
     const uint64 satp_content = va_to_pa(reinterpret_cast<uint64>(swapper_pg_dir))
@@ -205,7 +224,7 @@ auto setup_vm_final() -> void {
     // flush TLB
     __asm__ volatile("sfence.vma zero, zero");
 
-    printk(GREEN "TLB flushed, virtual memory init end\n" NC);
+    log_ok(const_cast<char*>("TLB flushed, second-time virtual memory initialization succeeded"));
 
     return;
 }
