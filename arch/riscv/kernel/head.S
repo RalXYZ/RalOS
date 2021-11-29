@@ -40,7 +40,7 @@ _start:
     ecall
 
     # initialize memory management system
-    jal ra, mm_init
+    call mm_init
 
     # after initialized free list of memory, we can use kalloc() to allocate page table
     call setup_vm_final  
@@ -50,7 +50,7 @@ _start:
     csrsi sstatus, 0b10
 
     # initialize threads
-    jal ra, task_init
+    call task_init
 
     j start_kernel
 
