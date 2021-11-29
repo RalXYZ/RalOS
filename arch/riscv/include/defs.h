@@ -32,7 +32,7 @@
 #define csr_read(csr)                       \
 ({                                          \
     register unsigned int __v;              \
-    __asm__ volatile ("csrr %0, " #csr          \
+    __asm__ volatile ("csrr %0, " #csr      \
             : "=r"(__v));                   \
     __v;                                    \
 })
@@ -40,7 +40,7 @@
 #define csr_write(csr, val)                 \
 ({                                          \
     unsigned int __v = (uint64)(val);       \
-    __asm__ volatile ("csrw " #csr ", %0"       \
+    __asm__ volatile ("csrw " #csr ", %0"   \
                     : : "r" (__v)           \
                     : "memory");            \
 })

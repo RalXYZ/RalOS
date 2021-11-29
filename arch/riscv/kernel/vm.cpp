@@ -19,6 +19,7 @@ extern uint64 _sbss;
 extern uint64 _ebss;
 extern uint64 _srodata;
 extern uint64 _erodata;
+extern uint64 _ekernel;
 
 using uint64 = unsigned long;
 
@@ -103,9 +104,7 @@ inline constexpr auto set_pte(const uint64 page_addr, const uint64 flags) -> uin
 
 // perform a 1GB mapping, only use one level page table
 auto setup_vm() -> void {
-    for (auto i = 0; i < 512; i++) {
-        early_pgtbl[i] = 0;
-    }
+    memset(early_pgtbl, 0x0, PGSIZE);
 
     constexpr uint64 one_level_pte_content = set_pte(PHY_START_CPP, PTE_VRWX);
 
@@ -121,49 +120,79 @@ auto setup_vm() -> void {
 // sz: the size of the mapping
 // flags: the protection bits of the mapping
 auto create_mapping(uint64* const pgtbl, const uint64 va, const uint64 pa, const uint64 sz, const uint64 flags) -> void {
-    auto level_1_index = get_pgtbl_index(va, 1);
-    auto level_2_index = get_pgtbl_index(va, 2);
-    auto level_3_index = get_pgtbl_index(va, 3);
+    for (uint64 i = 0; i < sz; i += PGSIZE) {
+        const auto current_va = va + i;
+        const auto current_pa = pa + i;
+        const auto level_1_index = get_pgtbl_index(current_va, 1);
+        const auto level_2_index = get_pgtbl_index(current_va, 2);
+        const auto level_3_index = get_pgtbl_index(current_va, 3);
     
-    if ((pgtbl[level_1_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
-        pgtbl[level_1_index] = set_pte(kalloc(), PTE_V);
-    }
+        if ((pgtbl[level_1_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
+            uint64 new_pgtbl = kalloc();
+            memset(reinterpret_cast<void*>(new_pgtbl), 0x0, PGSIZE);
+            pgtbl[level_1_index] = set_pte(va_to_pa(new_pgtbl) , PTE_V);
+        }
 
-    auto* const level_2_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(pgtbl[level_1_index]));
+        auto* const level_2_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(pgtbl[level_1_index]));
 
-    if ((level_2_pgtbl_ptr[level_2_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
-        level_2_pgtbl_ptr[level_2_index] = set_pte(kalloc(), PTE_V);
-    }
+        if ((level_2_pgtbl_ptr[level_2_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
+            uint64 new_pgtbl = kalloc();
+            memset(reinterpret_cast<void*>(new_pgtbl), 0x0, PGSIZE);
+            level_2_pgtbl_ptr[level_2_index] = set_pte(va_to_pa(new_pgtbl), PTE_V);
+        }
 
-    auto* const level_3_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(level_2_pgtbl_ptr[level_2_index]));
-    
-    if ((level_3_pgtbl_ptr[level_3_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
-        level_3_pgtbl_ptr[level_3_index] = set_pte(pa, flags);
-    }
+        auto* const level_3_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(level_2_pgtbl_ptr[level_2_index]));
 
-    for (uint64 i = 0; i < sz / PGSIZE; i++) {
-        level_3_pgtbl_ptr[level_3_index + i] = set_pte(pa + i * PGSIZE, flags);
+        level_3_pgtbl_ptr[level_3_index] = set_pte(current_pa, flags);
     }
 }
 
 auto setup_vm_final() -> void {
+    auto stext_addr = reinterpret_cast<uint64>(&_stext);
+    auto etext_addr = reinterpret_cast<uint64>(&_etext);
+    auto sdata_addr = reinterpret_cast<uint64>(&_sdata);
+    auto edata_addr = reinterpret_cast<uint64>(&_edata);
+    auto sbss_addr = reinterpret_cast<uint64>(&_sbss);
+    auto ebss_addr = reinterpret_cast<uint64>(&_ebss);
+    auto srodata_addr = reinterpret_cast<uint64>(&_srodata);
+    auto erodata_addr = reinterpret_cast<uint64>(&_erodata);
+    auto ekernel_addr = reinterpret_cast<uint64>(&_ekernel);
+
     memset(swapper_pg_dir, 0x0, PGSIZE);
 
     // No OpenSBI mapping required
 
     // mapping kernel text X|-|R|V
-    create_mapping(swapper_pg_dir, _stext, va_to_pa(_stext), align_diff_to_pgsize(_stext, _etext), PTE_VRX);
+    create_mapping(swapper_pg_dir, stext_addr, va_to_pa(stext_addr), align_diff_to_pgsize(stext_addr, etext_addr), PTE_VRX);
+    printk(GREEN ".text virtual memory mapped\n" NC);
 
     // mapping kernel rodata -|-|R|V
-    create_mapping(swapper_pg_dir, _srodata, va_to_pa(_srodata), align_diff_to_pgsize(_srodata, _erodata), PTE_VR);
+    create_mapping(swapper_pg_dir,
+            srodata_addr,
+            va_to_pa(srodata_addr),
+            align_diff_to_pgsize(srodata_addr, erodata_addr),
+            PTE_VR
+    );
+    printk(GREEN ".rodata virtual memory mapped\n" NC);
 
     // mapping other memory -|W|R|V
-    create_mapping(swapper_pg_dir, _sdata, va_to_pa(_sdata), align_diff_to_pgsize(_sdata, _edata), PTE_VRW);
-    create_mapping(swapper_pg_dir, _sbss, va_to_pa(_sbss), align_diff_to_pgsize(_sbss, _ebss), PTE_VR);
+    create_mapping(swapper_pg_dir, sdata_addr, va_to_pa(sdata_addr), align_diff_to_pgsize(sdata_addr, edata_addr), PTE_VRW);
+    printk(GREEN ".data virtual memory mapped\n" NC);
+    create_mapping(swapper_pg_dir, sbss_addr, va_to_pa(sbss_addr), align_diff_to_pgsize(sbss_addr, ebss_addr), PTE_VRW);
+    printk(GREEN ".data virtual memory mapped\n" NC);
+
+    const uint64 ekernel_rnd_up_addr = (ekernel_addr / PGSIZE + !!(ekernel_addr % PGSIZE)) * PGSIZE ;
+    create_mapping(swapper_pg_dir,
+            ekernel_rnd_up_addr,
+            va_to_pa(ekernel_rnd_up_addr),
+            align_diff_to_pgsize(ekernel_rnd_up_addr, VM_START + PHY_SIZE),
+            PTE_VRW
+    );
+    printk(GREEN "other virtual memory mapped\n" NC);
 
     // set satp with swapper_pg_dir
-    const uint64 satp_content = reinterpret_cast<uint64>(swapper_pg_dir)
-            >> PAGE_OFFSET_lEN 
+    const uint64 satp_content = va_to_pa(reinterpret_cast<uint64>(swapper_pg_dir))
+            >> PAGE_OFFSET_lEN
             |  RISCV_SV39_MODE_MASK; 
     __asm__ volatile (
         "mv t0, %[satp_content]\n"
@@ -175,5 +204,8 @@ auto setup_vm_final() -> void {
 
     // flush TLB
     __asm__ volatile("sfence.vma zero, zero");
+
+    printk(GREEN "TLB flushed, virtual memory init end\n" NC);
+
     return;
 }
