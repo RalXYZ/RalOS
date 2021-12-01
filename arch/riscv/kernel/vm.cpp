@@ -24,32 +24,32 @@ extern uint64 _erodata[];
 extern uint64 _ekernel[];
 
 // early_pgtbl: used for 1GB mapping of setup_vm
-unsigned long early_pgtbl[512] __attribute__((__aligned__(0x1000)));
+uint64 early_pgtbl[512] __attribute__((__aligned__(0x1000)));
 
-unsigned long swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
+uint64 swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
 
 // protection bits of Page Table Entries: | RSW |D|A|G|U|X|W|R|V|
 // set bit V | R | W | X to 1
-constexpr uint64 PTE_VRWX = 0b00'0000'1111;
+constexpr auto PTE_VRWX = 0b00'0000'1111ul;
 // set bit V to 1
-constexpr uint64 PTE_V = 0b00'0000'0001;
+constexpr auto PTE_V = 0b00'0000'0001ul;
 // set bit V | R | X to 1
-constexpr uint64 PTE_VRX = 0b00'0000'1011;
+constexpr auto PTE_VRX = 0b00'0000'1011ul;
 // set bit V | R to 1
-constexpr uint64 PTE_VR = 0b00'0000'0011;
+constexpr auto PTE_VR = 0b00'0000'0011ul;
 // set bit V | R | W to 1
-constexpr uint64 PTE_VRW = 0b00'0000'0111;
+constexpr auto PTE_VRW = 0b00'0000'0111ul;
 
-constexpr uint64 PTE_FLAGS_LEN = 10;
+constexpr auto PTE_FLAGS_LEN = 10ul;
 
-constexpr uint64 PHY_START_CPP = static_cast<uint64>(PHY_START);
-constexpr uint64 VM_START_CPP = static_cast<uint64>(VM_START);
-constexpr uint64 PA2VA_OFFSET_CPP = static_cast<uint64>(PA2VA_OFFSET);
+constexpr auto PHY_START_CPP = static_cast<uint64>(PHY_START);
+constexpr auto VM_START_CPP = static_cast<uint64>(VM_START);
+constexpr auto PA2VA_OFFSET_CPP = static_cast<uint64>(PA2VA_OFFSET);
 
 // length of page offset for both virtual and physical address
 // PTE: |  44 PPN  |  10 flags |
-constexpr uint64 PAGE_OFFSET_lEN = 12;
-constexpr uint64 PAGE_INDEX_LEN = 9;
+constexpr auto PAGE_OFFSET_lEN = 12ul;
+constexpr auto PAGE_INDEX_LEN = 9ul;
 
 consteval auto generate_mask(const uint64 len) -> uint64 {
     return (1 << len) - 1;
@@ -88,26 +88,35 @@ constexpr auto get_pgtbl_index(const uint64 va, const uint64 level) -> uint64 {
 }
 
 inline constexpr auto get_ppn_pgtbl_addr(const uint64 pte) -> uint64 {
-    return pte >> PTE_FLAGS_LEN << PAGE_OFFSET_lEN;
+    return pte 
+            >> PTE_FLAGS_LEN 
+            << PAGE_OFFSET_lEN;
 }
 
 inline constexpr auto set_pte(const uint64 page_addr, const uint64 flags) -> uint64 {
     return page_addr
-            >> PAGE_OFFSET_lEN                 // get 44-bit PPN of PTE
-            << PTE_FLAGS_LEN          // move left 10 bits for flags
-            |  flags;                          // set V | R | W | X to 1
+            >> PAGE_OFFSET_lEN          // get 44-bit PPN of PTE
+            << PTE_FLAGS_LEN            // move left 10 bits for flags
+            |  flags;                   // set V | R | W | X to 1
 }
 
 // perform a 1GB mapping, only use one level page table
 auto setup_vm() -> void {
     memset(early_pgtbl, 0x0, PGSIZE);
 
-    constexpr uint64 one_level_pte_content = set_pte(PHY_START_CPP, PTE_VRWX);
+    constexpr auto pte = set_pte(PHY_START_CPP, PTE_VRWX);
 
     // we split 64-bit va into: | high bit | 9 bit | 30 bit |
     // the middle 9 bits are used as index of early_pgtbl
-    early_pgtbl[get_pgtbl_index(PHY_START_CPP, 1)] = one_level_pte_content;
-    early_pgtbl[get_pgtbl_index(VM_START_CPP, 1)] = one_level_pte_content;
+
+    // since we only use one level page table,
+    // then a PTE is enough to map 1GB
+
+    // map 0x80000000(mem) to 0x80000000(phy)
+    early_pgtbl[get_pgtbl_index(PHY_START_CPP, 1)] = pte;
+
+    // map 0xffffffe000000000(mem) to 0x80000000(phy)
+    early_pgtbl[get_pgtbl_index(VM_START_CPP, 1)] = pte;
 
     log_ok(const_cast<char*>("First-time virtual memory mapping finished"));
 }
@@ -118,7 +127,7 @@ auto setup_vm() -> void {
 // sz: the size of the mapping
 // flags: the protection bits of the mapping
 auto create_mapping(uint64* const pgtbl, const uint64 va, const uint64 pa, const uint64 sz, const uint64 flags) -> void {
-    for (uint64 i = 0; i < sz; i += PGSIZE) {
+    for (auto i = 0ul; i < sz; i += PGSIZE) {
         const auto current_va = va + i;
         const auto current_pa = pa + i;
         const auto level_1_index = get_pgtbl_index(current_va, 1);
@@ -126,7 +135,7 @@ auto create_mapping(uint64* const pgtbl, const uint64 va, const uint64 pa, const
         const auto level_3_index = get_pgtbl_index(current_va, 3);
     
         if ((pgtbl[level_1_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
-            uint64 new_pgtbl = kalloc();
+            auto new_pgtbl = kalloc();
             memset(reinterpret_cast<void*>(new_pgtbl), 0x0, PGSIZE);
             pgtbl[level_1_index] = set_pte(va_to_pa(new_pgtbl) , PTE_V);
         }
@@ -134,7 +143,7 @@ auto create_mapping(uint64* const pgtbl, const uint64 va, const uint64 pa, const
         auto* const level_2_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(pgtbl[level_1_index]));
 
         if ((level_2_pgtbl_ptr[level_2_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
-            uint64 new_pgtbl = kalloc();
+            auto new_pgtbl = kalloc();
             memset(reinterpret_cast<void*>(new_pgtbl), 0x0, PGSIZE);
             level_2_pgtbl_ptr[level_2_index] = set_pte(va_to_pa(new_pgtbl), PTE_V);
         }
@@ -210,8 +219,7 @@ auto setup_vm_final() -> void {
             >> PAGE_OFFSET_lEN
             |  RISCV_SV39_MODE_MASK; 
     __asm__ volatile (
-        "mv t0, %[satp_content]\n"
-        "csrw satp, t0"
+        "csrw satp, %[satp_content]"
         : 
         : [satp_content] "r" (satp_content)
         : "memory"

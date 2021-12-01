@@ -5,7 +5,7 @@ extern "C" {
 
 // the frequency of QEMU has been set to be 10MHz
 // which means one second contains 10000000 clock cycles
-unsigned long TIME_CLOCK = 10'000'000;  // do not change this value
+auto TIME_CLOCK = 10'000'000ul;  // do not change this value
 
 auto get_cycles() {
     // get the value stored in `time` register

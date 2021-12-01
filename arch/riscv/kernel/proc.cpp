@@ -38,7 +38,7 @@ auto task_init() -> void {
     /* ----------------------------------------------- */
 
     // initialize task[1] ~ task[NR_TASKS - 1]
-    for (size_t i = 1; i < NR_TASKS; i++) {
+    for (auto i = 1ul; i < NR_TASKS; i++) {
         task[i] = reinterpret_cast<task_struct *>(kalloc());
         task[i]->state = TASK_RUNNING;
         task[i]->counter = 0;
@@ -56,13 +56,13 @@ auto task_init() -> void {
 }
 
 auto dummy() -> void {
-    const uint64 MOD = 1'000'000'007;
-    uint64 auto_inc_local_var = 0;
+    const auto MOD = 1'000'000'007ul;
+    auto auto_inc_local_var = 0ul;
     while (true) {
         if (current->counter != static_cast<uint64>(::last_counter) or ::last_counter == -1) {
             ::last_counter = current->counter;
             auto_inc_local_var = (auto_inc_local_var + 1) % MOD;
-            printk(GREEN "[PID = %d]" NC "is running, auto_inc_local_var = %d, thread space begin at 0xffffffe0%x\n", current->pid, auto_inc_local_var, current);
+            printk(GREEN "[PID = %d]" NC "is running, auto_inc_local_var = %d, thread space begin at %lx\n", current->pid, auto_inc_local_var, current);
         }
     }
 }
