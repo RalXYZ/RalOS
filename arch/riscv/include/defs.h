@@ -11,6 +11,10 @@
 #define PHY_SIZE  128 * 1024 * 1024 // 128MB, default size of QEMU memory 
 #define PHY_END   (PHY_START + PHY_SIZE)
 
+
+#define USER_START (0x0000000000000000) // user space start virtual address
+#define USER_END   (0x0000004000000000) // user space end virtual address
+
 #define PGSIZE 0x1000 // 4KB
 #define PGROUNDUP(addr) ((addr + PGSIZE - 1) & (~(PGSIZE - 1)))
 #define PGROUNDDOWN(addr) (addr & (~(PGSIZE - 1)))
