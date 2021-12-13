@@ -1,3 +1,5 @@
+#include "defs.h"
+
 .altmacro  # add this macro to make '.rept' macro works
 
 .set REG_SIZE, 8
@@ -35,19 +37,26 @@
 
 # ------------------------------------------------------------------------
 
-# switch sscratch and sp
+# swap sscratch and sp
 __switch_sscratch_sp:
-    addi sp, sp, -8
-    sd t0, 0(sp)
+    sd t0, -8(sp)
+    sd t1, -16(sp)
+
+    mv t1, sp
+
+    # swap
     csrr t0, sscratch
     csrw sscratch, sp
     mv sp, t0
+
+    ld t0, -8(t0)
+    ld t1, -16(t1)
+
     ret
 
 # ------------------------------------------------------------------------
 
 .globl _traps
-
 _traps:
     # switch to supervisor mode stack
     call __switch_sscratch_sp
@@ -147,5 +156,15 @@ __switch_to:
     csrw sepc, t1
     csrw sstatus, t2
     csrw sscratch, t3
+
+    ld t4, 24(t0)
+    li t5, PA2VA_OFFSET
+    neg t5, t5
+    add t4, t4, t5
+    srli t4, t4, 12
+    li t5, RISCV_SV39_MODE_MASK
+    or t4, t4, t5
+    csrw satp, t4
+    sfence.vma zero, zero
 
     ret

@@ -130,10 +130,8 @@ auto setup_vm() -> void {
 // va, pa: the virtual and physical address to be mapped
 // sz: the size of the mapping
 // flags: the protection bits of the mapping
-static auto create_mapping(
-        uint64* const pgtbl, const uint64 va, const uint64 pa, 
-        const uint64 sz, const uint64 flags, bool is_u_mode = false) -> void {
-    const auto PTE_V_FINAL = PTE_V | (is_u_mode ? PTE_U : 0);
+static auto create_mapping(uint64* const pgtbl, const uint64 va, const uint64 pa, const uint64 sz, const uint64 flags) -> void {
+    const auto PTE_V_FINAL = PTE_V | (flags & PTE_U);
     for (auto i = 0ul; i < sz; i += PGSIZE) {
         const auto current_va = va + i;
         const auto current_pa = pa + i;
@@ -141,14 +139,14 @@ static auto create_mapping(
         const auto level_2_index = get_pgtbl_index(current_va, 2);
         const auto level_3_index = get_pgtbl_index(current_va, 3);
     
-        if ((pgtbl[level_1_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
+        if ((pgtbl[level_1_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V_FINAL) {
             auto new_pgtbl = kalloc();
-            pgtbl[level_1_index] = set_pte(va_to_pa(new_pgtbl) , PTE_V_FINAL);
+            pgtbl[level_1_index] = set_pte(va_to_pa(new_pgtbl), PTE_V_FINAL);
         }
 
         auto* const level_2_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(pgtbl[level_1_index]) + PA2VA_OFFSET_CPP);
 
-        if ((level_2_pgtbl_ptr[level_2_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
+        if ((level_2_pgtbl_ptr[level_2_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V_FINAL) {
             auto new_pgtbl = kalloc();
             level_2_pgtbl_ptr[level_2_index] = set_pte(va_to_pa(new_pgtbl), PTE_V_FINAL);
         }
@@ -256,8 +254,7 @@ auto construct_u_mode_pgtbl() -> uint64* {
             USER_START,
             va_to_pa(uapp_start_addr_round_down),
             PGROUNDUP(uapp_end_addr - uapp_start_addr_round_down),
-            PTE_VRW | PTE_U,
-            true
+            PTE_VRX | PTE_U
     );
 
     // user mode stack memory mapping
@@ -265,8 +262,7 @@ auto construct_u_mode_pgtbl() -> uint64* {
             USER_END - PGSIZE,
             va_to_pa(kalloc()),     // kalloc the user mode stack
             PGSIZE,
-            PTE_VRW | PTE_U,
-            true
+            PTE_VRW | PTE_U
     );
 
     return u_mode_pgtbl;
