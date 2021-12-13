@@ -3,10 +3,10 @@ extern "C" {
     #include "log.h"
     #include "defs.h"
     #include "string.h"
+    #include "vm.h"
 }
 
 extern "C" {
-    #include "vm.h"
     void setup_vm();
     void setup_vm_final();
 }
@@ -146,19 +146,17 @@ auto create_mapping(
     
         if ((pgtbl[level_1_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
             auto new_pgtbl = kalloc();
-            memset(reinterpret_cast<void*>(new_pgtbl), 0x0, PGSIZE);
             pgtbl[level_1_index] = set_pte(va_to_pa(new_pgtbl) , PTE_V_FINAL);
         }
 
-        auto* const level_2_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(pgtbl[level_1_index]));
+        auto* const level_2_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(pgtbl[level_1_index]) + PA2VA_OFFSET_CPP);
 
         if ((level_2_pgtbl_ptr[level_2_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
             auto new_pgtbl = kalloc();
-            memset(reinterpret_cast<void*>(new_pgtbl), 0x0, PGSIZE);
             level_2_pgtbl_ptr[level_2_index] = set_pte(va_to_pa(new_pgtbl), PTE_V_FINAL);
         }
 
-        auto* const level_3_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(level_2_pgtbl_ptr[level_2_index]));
+        auto* const level_3_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(level_2_pgtbl_ptr[level_2_index]) + PA2VA_OFFSET_CPP);
 
         level_3_pgtbl_ptr[level_3_index] = set_pte(current_pa, flags);
     }
@@ -256,19 +254,21 @@ auto construct_u_mode_pgtbl() -> uint64* {
     auto uapp_start_addr = reinterpret_cast<uint64>(uapp_start);
     auto uapp_end_addr = reinterpret_cast<uint64>(uapp_end);
     auto uapp_start_addr_round_down = PGROUNDDOWN(uapp_start_addr);
-    create_mapping(swapper_pg_dir,
-            uapp_start_addr_round_down,
+    create_mapping(u_mode_pgtbl,
+            USER_START,
             va_to_pa(uapp_start_addr_round_down),
             PGROUNDUP(uapp_end_addr - uapp_start_addr_round_down),
-            PTE_VRW | PTE_U
+            PTE_VRW | PTE_U,
+            true
     );
 
     // user mode stack memory mapping
-    create_mapping(swapper_pg_dir,
+    create_mapping(u_mode_pgtbl,
             USER_END - PGSIZE,
             va_to_pa(kalloc()),     // kalloc the user mode stack
             PGSIZE,
-            PTE_VRW | PTE_U
+            PTE_VRW | PTE_U,
+            true
     );
 
     return u_mode_pgtbl;
