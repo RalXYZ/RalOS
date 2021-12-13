@@ -8,7 +8,7 @@ extern "C" {
 
 extern "C" {
     extern struct task_struct *current;  // proc.cpp
-    void trap_handler(uint64 cause, uint64 epc, struct pt_regs *regs);
+    void trap_handler(uint64 cause, [[maybe_unused]] uint64 sepc, struct pt_regs *regs);
 }
 
 constexpr auto INTERRUPT_MASK = 0x8000'0000'0000'0000ul;
@@ -50,14 +50,12 @@ auto non_interrupt_handler(uint64 scause, pt_regs *regs) -> void {
 
 }
 
-auto trap_handler(uint64 scause, uint64 sepc, pt_regs *regs) -> void {
+auto trap_handler(uint64 scause, [[maybe_unused]] uint64 sepc, pt_regs *regs) -> void {
     // judge the type of trap by scause
     if (!(scause & INTERRUPT_MASK)) {
        non_interrupt_handler(scause, regs);
         return;
     }
-
-    sepc += 0; // just use this parameter, in case of -Werror
 
     // judge whether it is a timer interrupt
     if ((scause & (~INTERRUPT_MASK)) != 5) {

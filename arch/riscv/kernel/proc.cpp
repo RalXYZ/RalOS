@@ -1,3 +1,5 @@
+#include "vm.hpp"
+
 extern "C" {
     #include "defs.h"
     #include "mm.h"
@@ -5,7 +7,6 @@ extern "C" {
     #include "printk.h"
     #include "proc.h"
     #include "log.h"
-    #include "vm.h"
 }
 
 extern "C" {

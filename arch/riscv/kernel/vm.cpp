@@ -1,9 +1,10 @@
+#include "vm.hpp"
+
 extern "C" {
     #include "mm.h"
     #include "log.h"
     #include "defs.h"
     #include "string.h"
-    #include "vm.h"
 }
 
 extern "C" {
@@ -26,7 +27,7 @@ extern uint64 _ekernel[];
 extern uint64 uapp_start[];
 extern uint64 uapp_end[];
 
-constexpr auto PGTBL_ELEMENT_COUNT = PGSIZE / sizeof(uint64);
+static constexpr auto PGTBL_ELEMENT_COUNT = PGSIZE / sizeof(uint64);
 
 // early_pgtbl: used for 1GB mapping of setup_vm
 uint64 early_pgtbl[PGTBL_ELEMENT_COUNT] __attribute__((__aligned__(0x1000)));
@@ -35,72 +36,68 @@ uint64 swapper_pg_dir[PGTBL_ELEMENT_COUNT] __attribute__((__aligned__(0x1000)));
 
 // protection bits of Page Table Entries: | RSW |D|A|G|U|X|W|R|V|
 // set bit V | R | W | X to 1
-constexpr auto PTE_VRWX = 0b00'0000'1111ul;
+static constexpr auto PTE_VRWX = 0b00'0000'1111ul;
 // set bit V to 1
-constexpr auto PTE_V = 0b00'0000'0001ul;
+static constexpr auto PTE_V = 0b00'0000'0001ul;
 // set bit V | R | X to 1
-constexpr auto PTE_VRX = 0b00'0000'1011ul;
+static constexpr auto PTE_VRX = 0b00'0000'1011ul;
 // set bit V | R to 1
-constexpr auto PTE_VR = 0b00'0000'0011ul;
+static constexpr auto PTE_VR = 0b00'0000'0011ul;
 // set bit V | R | W to 1
-constexpr auto PTE_VRW = 0b00'0000'0111ul;
+static constexpr auto PTE_VRW = 0b00'0000'0111ul;
 
-constexpr auto PTE_U = 0b00'0001'0000ul;
+static constexpr auto PTE_U = 0b00'0001'0000ul;
 
-constexpr auto PTE_FLAGS_LEN = 10ul;
+static constexpr auto PTE_FLAGS_LEN = 10ul;
 
-constexpr auto PHY_START_CPP = static_cast<uint64>(PHY_START);
-constexpr auto VM_START_CPP = static_cast<uint64>(VM_START);
-constexpr auto PA2VA_OFFSET_CPP = static_cast<uint64>(PA2VA_OFFSET);
+static constexpr auto PHY_START_CPP = static_cast<uint64>(PHY_START);
+static constexpr auto VM_START_CPP = static_cast<uint64>(VM_START);
+static constexpr auto PA2VA_OFFSET_CPP = static_cast<uint64>(PA2VA_OFFSET);
 
 // length of page offset for both virtual and physical address
 // PTE: |  44 PPN  |  10 flags |
-constexpr auto PAGE_OFFSET_lEN = 12ul;
-constexpr auto PAGE_INDEX_LEN = 9ul;
+static constexpr auto PAGE_OFFSET_lEN = 12ul;
+static constexpr auto PAGE_INDEX_LEN = 9ul;
 
-consteval auto generate_mask(const uint64 len) -> uint64 {
+static consteval auto generate_mask(const uint64 len) -> uint64 {
     return (1 << len) - 1;
 }
 
-inline auto va_to_pa(const uint64 va) -> uint64 {
+static inline auto va_to_pa(const uint64 va) -> uint64 {
     return va - PA2VA_OFFSET_CPP;
 }
 
-auto panic(char *content) -> void {
+static auto panic(char *content) -> void {
     log_failed(content);
     __asm__ volatile("ebreak");
 };
 
-constexpr auto get_pgtbl_index(const uint64 va, const uint64 level) -> uint64 {
+static constexpr auto get_pgtbl_index(const uint64 va, const uint64 level) -> uint64 {
+    auto ret_val = va;
+    ret_val >>= PAGE_OFFSET_lEN;
     switch (level) {
         case 1:
-            return va
-                    >> PAGE_OFFSET_lEN
-                    >> PAGE_INDEX_LEN
-                    >> PAGE_INDEX_LEN
-                    &  generate_mask(PAGE_INDEX_LEN);
+            ret_val >>= PAGE_INDEX_LEN;
+        [[fallthrough]];
         case 2:
-            return va
-                    >> PAGE_OFFSET_lEN
-                    >> PAGE_INDEX_LEN
-                    &  generate_mask(PAGE_INDEX_LEN);
+            ret_val >>= PAGE_INDEX_LEN;
+        [[fallthrough]];
         case 3:
-            return va
-                    >> PAGE_OFFSET_lEN
-                    &  generate_mask(PAGE_INDEX_LEN);
+            ret_val &= generate_mask(PAGE_INDEX_LEN);
+            break;
         default:
             panic(const_cast<char*>("Kernel panic: invalid page table level"));
-            return 0;  // never reach here
     }
+    return ret_val;
 }
 
-inline constexpr auto get_ppn_pgtbl_addr(const uint64 pte) -> uint64 {
+static inline constexpr auto get_ppn_pgtbl_addr(const uint64 pte) -> uint64 {
     return pte 
             >> PTE_FLAGS_LEN 
             << PAGE_OFFSET_lEN;
 }
 
-inline constexpr auto set_pte(const uint64 page_addr, const uint64 flags) -> uint64 {
+static inline constexpr auto set_pte(const uint64 page_addr, const uint64 flags) -> uint64 {
     return page_addr
             >> PAGE_OFFSET_lEN          // get 44-bit PPN of PTE
             << PTE_FLAGS_LEN            // move left 10 bits for flags
@@ -133,7 +130,7 @@ auto setup_vm() -> void {
 // va, pa: the virtual and physical address to be mapped
 // sz: the size of the mapping
 // flags: the protection bits of the mapping
-auto create_mapping(
+static auto create_mapping(
         uint64* const pgtbl, const uint64 va, const uint64 pa, 
         const uint64 sz, const uint64 flags, bool is_u_mode = false) -> void {
     const auto PTE_V_FINAL = PTE_V | (is_u_mode ? PTE_U : 0);
@@ -241,6 +238,7 @@ auto setup_vm_final() -> void {
     return;
 }
 
+[[nodiscard]]
 auto construct_u_mode_pgtbl() -> uint64* {
     // in order to prevent page table switching while switching 
     // between U-Mode and S-Mode, we also copy kernel page table 
