@@ -5,6 +5,7 @@ extern "C" {
     #include "printk.h"
     #include "proc.h"
     #include "log.h"
+    #include "vm.h"
 }
 
 extern "C" {
@@ -31,6 +32,9 @@ auto task_init() -> void {
     //  set the pid of idle to 0
     idle->pid = 0;
 
+    // `sscratch`of the kernel thread is always 0
+    idle->thread.sscratch = 0;
+
     // point current and task[0] to idle
     current = idle;
     task[0] = idle;
@@ -50,6 +54,18 @@ auto task_init() -> void {
         // `sp` is set to the highest address of the applied physical page
         task[i]->thread.ra = reinterpret_cast<uint64>(__dummy);
         task[i]->thread.sp = reinterpret_cast<uint64>(task[i]) + PGSIZE;
+
+        // set sepc as the starting virtual address of UAPP
+        task[i]->thread.sepc = USER_START;
+
+        // SUM: 18, SPP: 8, SPIE: 5
+        // SUM: enable access U-mode page in S-mode
+        // SPP: make `sret` return to U-mode
+        // SPIE: enable interrupts after `sret`
+        task[i]->thread.sstatus = 0b0100'0000'0001'0010'0000;
+
+        task[i]->thread.sscratch = USER_END;
+        task[i]->pgd = construct_u_mode_pgtbl();
     }
 
     log_ok(const_cast<char*>("Process initialization succeeded"));

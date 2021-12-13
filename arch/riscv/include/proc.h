@@ -3,12 +3,14 @@
 
 #include "types.h"
 
-#define NR_TASKS  (1 + 31) // control maximum thread amount （idle thread + 31 kernel threads）
+#define NR_TASKS (1 + 4) // control maximum thread amount （idle thread + 4 user mode threads）
 
 #define TASK_RUNNING 0 // to simplify the lab， all threads has only one state
 
 #define PRIORITY_MIN 1
 #define PRIORITY_MAX 10
+
+typedef uint64* pagetable_t;
 
 /* kernel and user mode stack pointer of the thread */
 struct thread_info {
@@ -21,6 +23,8 @@ struct thread_struct {
     uint64 ra;
     uint64 sp;
     uint64 s[12];
+
+    uint64 sepc, sstatus, sscratch; 
 };
 
 /* data structure of a thread */
@@ -32,6 +36,8 @@ struct task_struct {
     uint64 pid;      // thread id
 
     struct thread_struct thread;
+
+    pagetable_t pgd;
 };
 
 /* thread initialization, creates NR_TASKS threads */ 

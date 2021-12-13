@@ -6,6 +6,7 @@ extern "C" {
 }
 
 extern "C" {
+    #include "vm.h"
     void setup_vm();
     void setup_vm_final();
 }
@@ -22,11 +23,15 @@ extern uint64 _ebss[];
 extern uint64 _srodata[];
 extern uint64 _erodata[];
 extern uint64 _ekernel[];
+extern uint64 uapp_start[];
+extern uint64 uapp_end[];
+
+constexpr auto PGTBL_ELEMENT_COUNT = PGSIZE / sizeof(uint64);
 
 // early_pgtbl: used for 1GB mapping of setup_vm
-uint64 early_pgtbl[512] __attribute__((__aligned__(0x1000)));
+uint64 early_pgtbl[PGTBL_ELEMENT_COUNT] __attribute__((__aligned__(0x1000)));
 
-uint64 swapper_pg_dir[512] __attribute__((__aligned__(0x1000)));
+uint64 swapper_pg_dir[PGTBL_ELEMENT_COUNT] __attribute__((__aligned__(0x1000)));
 
 // protection bits of Page Table Entries: | RSW |D|A|G|U|X|W|R|V|
 // set bit V | R | W | X to 1
@@ -39,6 +44,8 @@ constexpr auto PTE_VRX = 0b00'0000'1011ul;
 constexpr auto PTE_VR = 0b00'0000'0011ul;
 // set bit V | R | W to 1
 constexpr auto PTE_VRW = 0b00'0000'0111ul;
+
+constexpr auto PTE_U = 0b00'0001'0000ul;
 
 constexpr auto PTE_FLAGS_LEN = 10ul;
 
@@ -126,7 +133,10 @@ auto setup_vm() -> void {
 // va, pa: the virtual and physical address to be mapped
 // sz: the size of the mapping
 // flags: the protection bits of the mapping
-auto create_mapping(uint64* const pgtbl, const uint64 va, const uint64 pa, const uint64 sz, const uint64 flags) -> void {
+auto create_mapping(
+        uint64* const pgtbl, const uint64 va, const uint64 pa, 
+        const uint64 sz, const uint64 flags, bool is_u_mode = false) -> void {
+    const auto PTE_V_FINAL = PTE_V | (is_u_mode ? PTE_U : 0);
     for (auto i = 0ul; i < sz; i += PGSIZE) {
         const auto current_va = va + i;
         const auto current_pa = pa + i;
@@ -137,7 +147,7 @@ auto create_mapping(uint64* const pgtbl, const uint64 va, const uint64 pa, const
         if ((pgtbl[level_1_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
             auto new_pgtbl = kalloc();
             memset(reinterpret_cast<void*>(new_pgtbl), 0x0, PGSIZE);
-            pgtbl[level_1_index] = set_pte(va_to_pa(new_pgtbl) , PTE_V);
+            pgtbl[level_1_index] = set_pte(va_to_pa(new_pgtbl) , PTE_V_FINAL);
         }
 
         auto* const level_2_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(pgtbl[level_1_index]));
@@ -145,7 +155,7 @@ auto create_mapping(uint64* const pgtbl, const uint64 va, const uint64 pa, const
         if ((level_2_pgtbl_ptr[level_2_index] & generate_mask(PTE_FLAGS_LEN)) != PTE_V) {
             auto new_pgtbl = kalloc();
             memset(reinterpret_cast<void*>(new_pgtbl), 0x0, PGSIZE);
-            level_2_pgtbl_ptr[level_2_index] = set_pte(va_to_pa(new_pgtbl), PTE_V);
+            level_2_pgtbl_ptr[level_2_index] = set_pte(va_to_pa(new_pgtbl), PTE_V_FINAL);
         }
 
         auto* const level_3_pgtbl_ptr = reinterpret_cast<uint64 *>(get_ppn_pgtbl_addr(level_2_pgtbl_ptr[level_2_index]));
@@ -231,4 +241,35 @@ auto setup_vm_final() -> void {
     log_ok(const_cast<char*>("TLB flushed, second-time virtual memory initialization succeeded"));
 
     return;
+}
+
+auto construct_u_mode_pgtbl() -> uint64* {
+    // in order to prevent page table switching while switching 
+    // between U-Mode and S-Mode, we also copy kernel page table 
+    // `swapper_pg_dir` to each process' page table
+    auto* const u_mode_pgtbl = reinterpret_cast<uint64*>(kalloc());
+    for (auto i = 0ul; i < PGTBL_ELEMENT_COUNT; i++) {
+        u_mode_pgtbl[i] = swapper_pg_dir[i];
+    }
+
+    // user mode `uapp` memory mapping
+    auto uapp_start_addr = reinterpret_cast<uint64>(uapp_start);
+    auto uapp_end_addr = reinterpret_cast<uint64>(uapp_end);
+    auto uapp_start_addr_round_down = PGROUNDDOWN(uapp_start_addr);
+    create_mapping(swapper_pg_dir,
+            uapp_start_addr_round_down,
+            va_to_pa(uapp_start_addr_round_down),
+            PGROUNDUP(uapp_end_addr - uapp_start_addr_round_down),
+            PTE_VRW | PTE_U
+    );
+
+    // user mode stack memory mapping
+    create_mapping(swapper_pg_dir,
+            USER_END - PGSIZE,
+            va_to_pa(kalloc()),     // kalloc the user mode stack
+            PGSIZE,
+            PTE_VRW | PTE_U
+    );
+
+    return u_mode_pgtbl;
 }

@@ -1,14 +1,14 @@
 .altmacro  # add this macro to make '.rept' macro works
 
 .set REG_SIZE, 8
-.set REG_NUM, 32
+.set REG_NUM, 33
 
 .macro SAVE_TO_SP_OFFSET reg, offset
     sd \reg, (\offset) * 8(sp)
 .endm
 
 .macro SAVE_TO_SP_OFFSET_N n
-    SAVE_TO_SP_OFFSET x\n, (\n) - 1
+    SAVE_TO_SP_OFFSET x\n, (\n)
 .endm
 
 .macro LOAD_FROM_SP_OFFSET reg, offset
@@ -16,7 +16,7 @@
 .endm
 
 .macro LOAD_FROM_SP_OFFSET_N n
-    LOAD_FROM_SP_OFFSET x\n, (\n) - 1
+    LOAD_FROM_SP_OFFSET x\n, (\n)
 .endm
 
 .macro SAVE_SX n, base
@@ -27,6 +27,7 @@
     ld s\n, \n * 8(\base)
 .endm
 
+.extern current  # points to the current thread, declared in proc.cpp
 .extern trap_handler
 .extern dummy
 .section .text.entry
@@ -34,34 +35,60 @@
 
 # ------------------------------------------------------------------------
 
+# switch sscratch and sp
+__switch_sscratch_sp:
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    csrr t0, sscratch
+    csrw sscratch, sp
+    mv sp, t0
+    ret
+
+# ------------------------------------------------------------------------
+
 .globl _traps
 
 _traps:
+    # switch to supervisor mode stack
+    call __switch_sscratch_sp
+
+    # when `sp` is zero, it means we are in kernel mode, 
+    # so we should not switch between user and supervisor stack
+    bnez sp, _trap_continue
+    call __switch_sscratch_sp
+    
+_trap_continue:
     # save 32 registers and sepc to stack
     addi sp, sp, -1 * REG_SIZE * REG_NUM
 
-    .set n, 1
-    .rept 31
+    .set n, 0
+    .rept 32
         SAVE_TO_SP_OFFSET_N %n
         .set n, n + 1
     .endr
     csrr a1, sepc  # a1 could be the parameter of 'trap_handler' below! do not change this register!
-    SAVE_TO_SP_OFFSET a1, 31
+    SAVE_TO_SP_OFFSET a1, 32
+
+    # `regs` param
+    mv a2, sp
 
     # call trap_handler
     csrr a0, scause
-    jal ra, trap_handler    
+    jal ra, trap_handler
 
     # restore sepc and 32 registers (x2(sp) should be restore last) from stack
-    LOAD_FROM_SP_OFFSET t0, 31
+    LOAD_FROM_SP_OFFSET t0, 32
     csrw sepc, t0
-    .set n, 1
-    .rept 31
+    .set n, 0
+    .rept 32
         LOAD_FROM_SP_OFFSET_N %n
         .set n, n + 1
     .endr
     
     addi sp, sp, REG_SIZE * REG_NUM
+
+    # switch to user mode stack
+    call __switch_sscratch_sp
 
     # return from trap
     sret
@@ -70,8 +97,11 @@ _traps:
 
 .global __dummy
 __dummy:
-    la t0, dummy
-    csrw sepc, t0
+    # la t0, dummy
+    # csrw sepc, t0
+
+    call __switch_sscratch_sp
+
     sret
 
 # ------------------------------------------------------------------------
@@ -90,6 +120,14 @@ __switch_to:
         .set n, n + 1
     .endr
 
+    addi t0, t0, 12 * 8  # points to `thread_struct.sepc`
+    csrr t1, sepc
+    csrr t2, sstatus
+    csrr t3, sscratch
+    sd t1, 0(t0)
+    sd t2, 8(t0)
+    sd t3, 16(t0)
+
     # restore state from next process
     addi t0, a1, 5 * 8
     ld ra, 0(t0)
@@ -101,5 +139,13 @@ __switch_to:
         LOAD_SX %n, t0
         .set n, n + 1
     .endr
+
+    addi t0, t0, 12 * 8  # points to `thread_struct.sepc`
+    ld t1, 0(t0)
+    ld t2, 8(t0)
+    ld t3, 16(t0)
+    csrw sepc, t1
+    csrw sstatus, t2
+    csrw sscratch, t3
 
     ret
