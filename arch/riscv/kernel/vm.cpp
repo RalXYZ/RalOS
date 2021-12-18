@@ -63,7 +63,7 @@ static consteval auto generate_mask(const uint64 len) -> uint64 {
     return (1 << len) - 1;
 }
 
-static inline auto va_to_pa(const uint64 va) -> uint64 {
+auto va_to_pa(const uint64 va) -> uint64 {
     return va - PA2VA_OFFSET_CPP;
 }
 
@@ -101,7 +101,7 @@ static inline constexpr auto set_pte(const uint64 page_addr, const uint64 flags)
     return page_addr
             >> PAGE_OFFSET_lEN          // get 44-bit PPN of PTE
             << PTE_FLAGS_LEN            // move left 10 bits for flags
-            |  flags;                   // set V | R | W | X to 1
+            |  flags;                   // set flags
 }
 
 // perform a 1GB mapping, only use one level page table

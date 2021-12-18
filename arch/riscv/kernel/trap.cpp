@@ -51,6 +51,8 @@ auto non_interrupt_handler(uint64 scause, pt_regs *regs) -> void {
 }
 
 auto trap_handler(uint64 scause, [[maybe_unused]] uint64 sepc, pt_regs *regs) -> void {
+    // printk("trap_handler: scause = %d, sepc = %lx\n", scause, sepc);
+
     // judge the type of trap by scause
     if (!(scause & INTERRUPT_MASK)) {
        non_interrupt_handler(scause, regs);

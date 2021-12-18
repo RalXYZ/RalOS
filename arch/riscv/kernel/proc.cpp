@@ -66,7 +66,7 @@ auto task_init() -> void {
         task[i]->thread.sstatus = 0b0100'0000'0001'0010'0000;
 
         task[i]->thread.sscratch = USER_END;
-        task[i]->pgd = construct_u_mode_pgtbl();
+        task[i]->pgd = reinterpret_cast<uint64*>(va_to_pa(reinterpret_cast<uint64>(construct_u_mode_pgtbl())));
     }
 
     log_ok(const_cast<char*>("Process initialization succeeded"));

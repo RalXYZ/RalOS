@@ -37,7 +37,7 @@ struct task_struct {
 
     struct thread_struct thread;
 
-    pagetable_t pgd;
+    pagetable_t pgd;  // this stores the PHYSICAL address of the page table
 };
 
 /* thread initialization, creates NR_TASKS threads */ 

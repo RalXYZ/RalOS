@@ -158,9 +158,6 @@ __switch_to:
     csrw sscratch, t3
 
     ld t4, 24(t0)
-    li t5, PA2VA_OFFSET
-    neg t5, t5
-    add t4, t4, t5
     srli t4, t4, 12
     li t5, RISCV_SV39_MODE_MASK
     or t4, t4, t5

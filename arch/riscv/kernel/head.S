@@ -47,7 +47,7 @@ _start:
 
     # sstatus: ... UPIE 0 0 SIE UIE
     # set sstatus[SIE] = 1
-    csrsi sstatus, 0b10
+    # csrsi sstatus, 0b10
 
     # initialize threads
     call task_init
