@@ -35,17 +35,10 @@ uint64 early_pgtbl[PGTBL_ELEMENT_COUNT] __attribute__((__aligned__(0x1000)));
 uint64 swapper_pg_dir[PGTBL_ELEMENT_COUNT] __attribute__((__aligned__(0x1000)));
 
 // protection bits of Page Table Entries: | RSW |D|A|G|U|X|W|R|V|
-// set bit V | R | W | X to 1
-static constexpr auto PTE_VRWX = 0b00'0000'1111ul;
-// set bit V to 1
 static constexpr auto PTE_V = 0b00'0000'0001ul;
-// set bit V | R | X to 1
-static constexpr auto PTE_VRX = 0b00'0000'1011ul;
-// set bit V | R to 1
-static constexpr auto PTE_VR = 0b00'0000'0011ul;
-// set bit V | R | W to 1
-static constexpr auto PTE_VRW = 0b00'0000'0111ul;
-
+static constexpr auto PTE_R = 0b00'0000'0010ul;
+static constexpr auto PTE_W = 0b00'0000'0100ul;
+static constexpr auto PTE_X = 0b00'0000'1000ul;
 static constexpr auto PTE_U = 0b00'0001'0000ul;
 
 static constexpr auto PTE_FLAGS_LEN = 10ul;
@@ -108,7 +101,7 @@ static inline constexpr auto set_pte(const uint64 page_addr, const uint64 flags)
 auto setup_vm() -> void {
     memset(early_pgtbl, 0x0, PGSIZE);
 
-    constexpr auto pte = set_pte(PHY_START_CPP, PTE_VRWX);
+    constexpr auto pte = set_pte(PHY_START_CPP, PTE_V | PTE_R | PTE_W | PTE_X);
 
     // we split 64-bit va into: | high bit | 9 bit | 30 bit |
     // the middle 9 bits are used as index of early_pgtbl
@@ -179,7 +172,7 @@ auto setup_vm_final() -> void {
             stext_addr,
             va_to_pa(stext_addr),
             PGROUNDUP(etext_addr - stext_addr),
-            PTE_VRX
+            PTE_V | PTE_R | PTE_X
     );
     log_ok(const_cast<char*>(".text   virtual memory mapped, permission set to R-X"));
 
@@ -188,7 +181,7 @@ auto setup_vm_final() -> void {
             srodata_addr,
             va_to_pa(srodata_addr),
             PGROUNDUP(erodata_addr - srodata_addr),
-            PTE_VR
+            PTE_V | PTE_R
     );
     log_ok(const_cast<char*>(".rodata virtual memory mapped, permission set to R--"));
 
@@ -197,14 +190,14 @@ auto setup_vm_final() -> void {
             sdata_addr,
             va_to_pa(sdata_addr),
             PGROUNDUP(edata_addr - sdata_addr),
-            PTE_VRW
+            PTE_V | PTE_R | PTE_W
     );
     log_ok(const_cast<char*>(".data   virtual memory mapped, permission set to RW-"));
     create_mapping(swapper_pg_dir,
             sbss_addr,
             va_to_pa(sbss_addr),
             PGROUNDUP(ebss_addr - sbss_addr),
-            PTE_VRW
+            PTE_V | PTE_R | PTE_W
     );
     log_ok(const_cast<char*>(".bss    virtual memory mapped, permission set to RW-"));
 
@@ -213,7 +206,7 @@ auto setup_vm_final() -> void {
             ekernel_rnd_up_addr,
             va_to_pa(ekernel_rnd_up_addr),
             PGROUNDUP(VM_START + PHY_SIZE - ekernel_rnd_up_addr),
-            PTE_VRW
+            PTE_V | PTE_R | PTE_W
     );
     log_ok(const_cast<char*>("Other   virtual memory mapped, permission set to RW-"));
 
@@ -259,8 +252,8 @@ auto construct_u_mode_pgtbl() -> uint64* {
     create_mapping(u_mode_pgtbl,
             USER_START,
             va_to_pa(uapp_start_addr_round_down),
-            PGROUNDUP(uapp_end_addr - uapp_start_addr_round_down) * 2,   // FIXME: remove `* 2`
-            PTE_VRWX | PTE_U                                             // FIXME: only enable R-X
+            PGROUNDUP(uapp_end_addr - uapp_start_addr_round_down) * 2,  // FIXME: remove `* 2`
+            PTE_V | PTE_R | PTE_W | PTE_X | PTE_U                       // FIXME: only enable R-X
     );
 
     // user mode stack memory mapping
@@ -268,7 +261,7 @@ auto construct_u_mode_pgtbl() -> uint64* {
             USER_END - PGSIZE,
             va_to_pa(kalloc()),     // kalloc the user mode stack
             PGSIZE,
-            PTE_VRW | PTE_U
+            PTE_V | PTE_R | PTE_W | PTE_U
     );
 
     return u_mode_pgtbl;
