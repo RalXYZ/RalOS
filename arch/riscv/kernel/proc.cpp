@@ -92,7 +92,7 @@ auto switch_to(task_struct* next) -> void {
         auto prev = current;
         current = next;
         ::last_counter = -1;
-        printk(YELLOW "\nswitch to [PID = %d COUNTER = %d PRIORITY = %d]\n" NC, next->pid, next->counter, next->priority);
+        printk(S_MODE_STRING "switch to [PID = %d COUNTER = %d PRIORITY = %d]\n", next->pid, next->counter, next->priority);
         __switch_to(prev, next);
     }
 }
@@ -122,10 +122,9 @@ auto schedule() -> void {
     if (has_min) {
         switch_to(task[min_index]);
     } else {
-        printk("\n");
         for (size_t i = 1; i < NR_TASKS; i++) {
             task[i]->counter = rand();
-            printk(BLUE "set [PID = %d COUNTER = %d]\n" NC, task[i]->pid, task[i]->counter);
+            printk(S_MODE_STRING "set [PID = %d COUNTER = %d]\n", task[i]->pid, task[i]->counter);
         }
         schedule();
     }
@@ -155,10 +154,9 @@ auto schedule() -> void {
     if (has_prior) {
         switch_to(task[min_index]);
     } else {
-        printk("\n");
         for (size_t i = 1; i < NR_TASKS; i++) {
             task[i]->counter = rand();
-            printk(BLUE "set [PID = %d COUNTER = %d PRIORITY = %d]\n" NC, task[i]->pid, task[i]->counter, task[i]->priority);
+            printk(S_MODE_STRING "set [PID = %d COUNTER = %d PRIORITY = %d]\n", task[i]->pid, task[i]->counter, task[i]->priority);
         }
         schedule();
     }

@@ -7,6 +7,8 @@
 #define RED   "\033[0;31m"
 #define NC "\033[0m"
 
+#define S_MODE_STRING "[" BLUE "S-MODE" NC "] "
+
 #define PHY_START 0x0000000080000000
 #define PHY_SIZE  128 * 1024 * 1024 // 128MB, default size of QEMU memory 
 #define PHY_END   (PHY_START + PHY_SIZE)
