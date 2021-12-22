@@ -33,9 +33,9 @@ auto non_interrupt_handler(uint64 scause, pt_regs *regs) -> void {
     switch (regs->x[static_cast<uint64>(REGISTERS::a7)]) {
     case SYS_WRITE:
         regs->x[static_cast<uint64>(REGISTERS::a0)] = sys_write(
-                static_cast<uint32_t>(regs->x[static_cast<uint64>(REGISTERS::a1)]),
-                reinterpret_cast<const char *>(regs->x[static_cast<uint64>(REGISTERS::a2)]),
-                regs->x[static_cast<uint64>(REGISTERS::a3)]
+                static_cast<uint32_t>(regs->x[static_cast<uint64>(REGISTERS::a0)]),
+                reinterpret_cast<const char *>(regs->x[static_cast<uint64>(REGISTERS::a1)]),
+                regs->x[static_cast<uint64>(REGISTERS::a2)]
         );
         break;
     
@@ -55,7 +55,7 @@ auto trap_handler(uint64 scause, [[maybe_unused]] uint64 sepc, pt_regs *regs) ->
 
     // judge the type of trap by scause
     if (!(scause & INTERRUPT_MASK)) {
-       non_interrupt_handler(scause, regs);
+        non_interrupt_handler(scause, regs);
         return;
     }
 

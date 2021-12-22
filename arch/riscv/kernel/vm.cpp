@@ -250,11 +250,17 @@ auto construct_u_mode_pgtbl() -> uint64* {
     auto uapp_start_addr = reinterpret_cast<uint64>(uapp_start);
     auto uapp_end_addr = reinterpret_cast<uint64>(uapp_end);
     auto uapp_start_addr_round_down = PGROUNDDOWN(uapp_start_addr);
+    // FIXME: The memory we need to map here only contains uapp,
+    // which only enables R-X permission, and assign only one page.
+    // However, the user program requires .data segment, since it
+    // has global variable. In this case, I simply multiply the page
+    // assign to uapp to 2, and set R-W-X permission. For sure, this
+    // is a temporary solution, and must be fixed in the future.
     create_mapping(u_mode_pgtbl,
             USER_START,
             va_to_pa(uapp_start_addr_round_down),
-            PGROUNDUP(uapp_end_addr - uapp_start_addr_round_down),
-            PTE_VRX | PTE_U
+            PGROUNDUP(uapp_end_addr - uapp_start_addr_round_down) * 2,   // FIXME: remove `* 2`
+            PTE_VRWX | PTE_U                                             // FIXME: only enable R-X
     );
 
     // user mode stack memory mapping

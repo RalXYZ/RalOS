@@ -35,7 +35,7 @@
 
 #define csr_read(csr)                       \
 ({                                          \
-    register unsigned int __v;              \
+    unsigned int __v;                       \
     __asm__ volatile ("csrr %0, " #csr      \
             : "=r"(__v));                   \
     __v;                                    \

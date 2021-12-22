@@ -63,7 +63,10 @@ auto task_init() -> void {
         // SUM: enable access U-mode page in S-mode
         // SPP: make `sret` return to U-mode
         // SPIE: enable interrupts after `sret`
-        task[i]->thread.sstatus = 0b0100'0000'0001'0010'0000;
+        task[i]->thread.sstatus = csr_read(sstatus);
+        task[i]->thread.sstatus &= ~(1ull << 8);  // clear SPP
+        task[i]->thread.sstatus |= 1ull << 5;     // set SPIE
+        task[i]->thread.sstatus |= 1ull << 18;    // set SUM    
 
         task[i]->thread.sscratch = USER_END;
         task[i]->pgd = reinterpret_cast<uint64*>(va_to_pa(reinterpret_cast<uint64>(construct_u_mode_pgtbl())));

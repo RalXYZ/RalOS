@@ -37,8 +37,9 @@
 
 # ------------------------------------------------------------------------
 
-# swap sscratch and sp
-__switch_sscratch_sp:
+# swap sscratch and sp without changing the value
+# of any register
+.macro SWITCH_SSCRATCH_SP
     sd t0, -8(sp)
     sd t1, -16(sp)
 
@@ -51,20 +52,19 @@ __switch_sscratch_sp:
 
     ld t0, -8(t0)
     ld t1, -16(t1)
-
-    ret
+.endm
 
 # ------------------------------------------------------------------------
 
 .globl _traps
 _traps:
     # switch to supervisor mode stack
-    call __switch_sscratch_sp
+    SWITCH_SSCRATCH_SP
 
     # when `sp` is zero, it means we are in kernel mode, 
     # so we should not switch between user and supervisor stack
     bnez sp, _trap_continue
-    call __switch_sscratch_sp
+    SWITCH_SSCRATCH_SP
     
 _trap_continue:
     # save 32 registers and sepc to stack
@@ -97,7 +97,7 @@ _trap_continue:
     addi sp, sp, REG_SIZE * REG_NUM
 
     # switch to user mode stack
-    call __switch_sscratch_sp
+    SWITCH_SSCRATCH_SP
 
     # return from trap
     sret
@@ -109,7 +109,7 @@ __dummy:
     # la t0, dummy
     # csrw sepc, t0
 
-    call __switch_sscratch_sp
+    SWITCH_SSCRATCH_SP
 
     sret
 
